@@ -5,7 +5,7 @@ Based on https://huggingface.co/blog/annotated-diffusion,
 which implements the DDPM paper https://arxiv.org/abs/2006.11239.
 """
 
-import tqdm
+import os
 import functools
 import pathlib
 import inspect
@@ -14,6 +14,8 @@ import einops
 from einops.layers.torch import Rearrange
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from tqdm.auto import tqdm
 
 import torch
 import torchvision
@@ -22,6 +24,8 @@ import torchvision
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(f"Using {device} device")
 print()
+results_folder = pathlib.Path("./results")
+results_folder.mkdir(exist_ok = True)
 #---------------------------------------------
 # Download the MNIST dataset using torchvision
 # 60k+10k 28x28 black-and-white images of handwritten digits
@@ -30,8 +34,8 @@ print('------------------ Dataset ------------------')
 
 # Download the pre-existing Dataset and convert to tensors
 print('Loading MNIST digit dataset...')
-train_dataset = torchvision.datasets.MNIST('~/.pytorch/MNIST_data/', download=True, train=True, 
-                                   transform=torchvision.transforms.ToTensor())
+train_dataset = torchvision.datasets.MNIST('~/.pytorch/MNIST_data/', download=True, train=True,
+                                           transform=torchvision.transforms.ToTensor())
 
 # We want to create a dataset of:
 #   - (x_t, t, label) for each t in [0,50]
@@ -42,7 +46,7 @@ train_dataset = torchvision.datasets.MNIST('~/.pytorch/MNIST_data/', download=Tr
 #       - Train our model to learn the noise mapping the diffused image to the original image, for the given t
 
 # Construct a dataloader
-batch_size = 64
+batch_size = 100
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 # Get an example image
@@ -86,7 +90,7 @@ print('--------------------------------------------')
 #---------------------------------------------
 
 # Define beta schedule, and define related parameters: alpha, alpha_bar
-T = 50
+T = 300
 beta = torch.linspace(0.0001, 0.02, T)
 alpha = 1. - beta
 alphabar = torch.cumprod(alpha, axis=0)
@@ -125,9 +129,9 @@ def q(x_0, t, noise=None):
 t = torch.tensor([T-1])
 difuze = q(img0, t)
 plt.imshow(img0.numpy(), cmap='gray', vmin=0, vmax=1)
-plt.savefig(f'img0.png')
+plt.savefig(str(results_folder / f'img0.png'))
 plt.imshow(difuze.numpy(), cmap='gray', vmin=0, vmax=1)
-plt.savefig(f'img0_diffused.png')
+plt.savefig(str(results_folder / f'img0_diffused.png'))
 
 #---------------------------------------------
 # Define the model: https://huggingface.co/blog/annotated-diffusion
@@ -441,96 +445,10 @@ class Unet(torch.nn.Module):
         x = self.final_res_block(x, t)
         return self.final_conv(x)
 
-# Create an instance of the network
-model = Unet(
-    dim=image_dim,
-    channels=1,
-    dim_mults=(1, 2, 4,)
-)
-model.to(device)
-
-# Hyperparameters
-learning_rate = 1e-3
-n_epochs = 10
-
-# Defining the loss function
-def p_losses(denoise_model, x_0, t, noise=None):
-    if noise is None:
-        noise = torch.randn_like(x_0)
-
-    x_noisy = q(x_0=x_0, t=t, noise=noise)
-    predicted_noise = denoise_model(x_noisy, t)
-
-    loss = torch.nn.functional.mse_loss(noise, predicted_noise)
-
-    return loss
-
-# Define optimizer
-loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-training_loss = []
-
-# Some functionality to save intermediate images
-def num_to_groups(num, divisor):
-    groups = num // divisor
-    remainder = num % divisor
-    arr = [divisor] * groups
-    if remainder > 0:
-        arr.append(remainder)
-    return arr
-
-results_folder = pathlib.Path("./results")
-results_folder.mkdir(exist_ok = True)
-save_and_sample_every = 1000
-
-#---------------------------------------------
-# Training the denoising model
-#---------------------------------------------
-print()
-print('--------------- Training Model ---------------')
-for epoch in range(n_epochs):
-    print(f'Epoch {epoch}')
-    for step, batch in enumerate(train_dataloader):
-      
-      batch = batch[0].to(device)
-
-      # Algorithm 1 line 3: sample t uniformally for every example in the batch
-      t = torch.randint(0, T, (batch_size,), device=device).long()
-
-      loss = p_losses(model, batch, t)
-      training_loss.append(loss.detach().numpy().item())
-
-      if step % 100 == 0:
-        print(f"  Loss (step {step}):", loss.item())
-
-      loss.backward()
-      optimizer.step()
-      optimizer.zero_grad()
-
-      # save generated images
-      if step != 0 and step % save_and_sample_every == 0:
-        milestone = step // save_and_sample_every
-        batches = num_to_groups(4, batch_size)
-        all_images_list = list(map(lambda n: sample(model, batch_size=n, channels=1), batches))
-        all_images = torch.cat(all_images_list, dim=0)
-        all_images = (all_images + 1) * 0.5
-        torchvision.utils.save_image(all_images, str(results_folder / f'sample-{milestone}.png'), nrow = 6)
-
-print('Done training!')
-l = [training_loss[i] for i in range(len(training_loss)) if i%1 ==0]
-plt.plot(l)
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.savefig(f'loss.pdf')
-
-
 #---------------------------------------------
 # Sampling
 # With a trained model, we can now subtract the noise
 #---------------------------------------------
-print()
-print('------------------ Sampling ------------------')
-print('--------------------------------------------')
 @torch.no_grad()
 def p_sample(model, x, t, t_index):
     betas_t = extract(beta, t, x.shape)
@@ -565,23 +483,106 @@ def p_sample_loop(model, shape):
     return imgs
 
 @torch.no_grad()
-def sample(model, image_size, batch_size=16, channels=3):
+def sample(model, image_size, batch_size=16, channels=1):
     return p_sample_loop(model, shape=(batch_size, channels, image_size, image_size))
 
-# Let's sample from our trained model
+#---------------------------------------------
+# Training the denoising model
+#---------------------------------------------
+print()
+print('------------------- Model -------------------')
+
+# Create an instance of the network
+model = Unet(
+    dim=image_dim,
+    channels=1,
+    dim_mults=(1, 2, 4,)
+)
+model.to(device)
+
+def count_parameters(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters: {total_params}")
+    print(f"Trainable parameters: {total_trainable_params}")
+count_parameters(model)
+
+print()
+print('------------------ Training ------------------')
+# Hyperparameters
+learning_rate = 1e-3
+n_epochs = 10
+
+# Defining the loss function
+def p_losses(denoise_model, x_0, t, noise=None):
+    if noise is None:
+        noise = torch.randn_like(x_0)
+
+    x_noisy = q(x_0=x_0, t=t, noise=noise)
+    predicted_noise = denoise_model(x_noisy, t)
+
+    loss = torch.nn.functional.mse_loss(noise, predicted_noise)
+
+    return loss
+
+# Define optimizer
+loss_fn = torch.nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+training_loss = []
+
+model_outputfile = str(results_folder / 'model.pkl')
+if os.path.exists(model_outputfile):
+    model.load_state_dict(torch.load(model_outputfile))
+    print(f"Loaded trained model from: {model_outputfile} (delete and re-run if you'd like to re-train)")
+else:
+    for epoch in range(n_epochs):
+        print(f'Epoch {epoch}')
+        for step, batch in enumerate(train_dataloader):
+        
+            batch = batch[0].to(device)
+
+            # Algorithm 1 line 3: sample t uniformally for every example in the batch
+            t = torch.randint(0, T, (batch_size,), device=device).long()
+
+            loss = p_losses(model, batch, t)
+            training_loss.append(loss.cpu().detach().numpy().item())
+
+            if step % 100 == 0:
+                print(f"  Loss (step {step}):", loss.item())
+
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+    print('Done training!')
+    torch.save(model.state_dict(), model_outputfile)
+    print(f'Saved model: {model_outputfile}')
+    plt.plot(training_loss)
+    plt.xlabel('Training step')
+    plt.ylabel('Loss')
+    plt.savefig(str(results_folder / f'loss.png'))
+    plt.clf()
+
+#---------------------------------------------
+# Sampling from the trained model
+#---------------------------------------------
+print()
+print('------------------ Sampling ------------------')
+print('--------------------------------------------')
 # sample 64 images
 samples = sample(model, image_size=image_dim, batch_size=batch_size, channels=1)
+for random_index in range(10):
 
-# show a random one
-random_index = 5
-plt.imshow(samples[-1][random_index].reshape(image_dim, image_dim, 1), cmap="gray")
-plt.savefig(f'img{random_index}_generated.png')
+    # Plot
+    plt.imshow(samples[-1][random_index].reshape(image_dim, image_dim, 1), cmap="gray")
+    plt.savefig(str(results_folder / f'{random_index}_generated.png'))
+    plt.clf()
 
-# Generate a gif of denoising
-fig = plt.figure()
-ims = []
-for i in range(T):
-    im = plt.imshow(samples[i][random_index].reshape(image_dim, image_dim, 1), cmap="gray", animated=True)
-    ims.append([im])
-animate = matplotlib.animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
-animate.save(f'img{random_index}_generated.gif')
+    # Generate a gif of denoising
+    fig = plt.figure()
+    ims = []
+    for i in range(T):
+        im = plt.imshow(samples[i][random_index].reshape(image_dim, image_dim, 1), cmap="gray", animated=True)
+        ims.append([im])
+    animate = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
+    animate.save(str(results_folder / f'{random_index}_generated.gif'))
