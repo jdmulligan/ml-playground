@@ -18,6 +18,10 @@ You can also find my code from my published research on [ML applications to high
 - [arXiv 2210.06450](https://arxiv.org/abs/2210.06450) :  https://github.com/jdmulligan/ml-eic-flavor
 - [arXiv 2111.14589](https://arxiv.org/abs/) :  https://github.com/matplo/pyjetty/tree/master/pyjetty/alice_analysis/process/user/ml
 - [arXiv 2102.11337](https://arxiv.org/abs/2102.11337) :  https://github.com/jdmulligan/bayesian-inference
+  
+And ongoing projects at:
+- Conditional diffusion models: https://github.com/jdmulligan/QCD-Diffusion
+- Graph neural networks: https://github.com/jdmulligan/Subjet-GNN
 
 ## To set up a new project
 
