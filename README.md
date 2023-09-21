@@ -4,9 +4,10 @@ This repository contains a collection of small python projects implementing vari
 
 These include the following topics:
 - Large Language Models (LLMs): Variety of examples and mini-projects, primarily using HuggingFace
-- Graph Neural Networks (GNNs): Coming soon...
+- Diffusion Models: Coming soon...
+- Graph Neural Networks (GNNs): Examples using PyG (PyTorch) and jraph (JAX)
 - Reinforcement Learning (RL): Coming soon...
-- Multi-layer perceptron (MLP): Implementation of backpropagation from scratch
+- Multi-layer perceptron (MLP) and logistic regression: Implementation of backpropagation from scratch
 
 A variety of ML libraries are used across the different projects:
 - PyTorch
@@ -16,7 +17,7 @@ A variety of ML libraries are used across the different projects:
 You can also find my code from my published research on [ML applications to high-energy physics](https://www.jamesdmulligan.com/#projects) at the following:
 - [arXiv 2305.08979](https://arxiv.org/abs/2305.08979) :  https://github.com/jdmulligan/JFN
 - [arXiv 2210.06450](https://arxiv.org/abs/2210.06450) :  https://github.com/jdmulligan/ml-eic-flavor
-- [arXiv 2111.14589](https://arxiv.org/abs/) :  https://github.com/matplo/pyjetty/tree/master/pyjetty/alice_analysis/process/user/ml
+- [arXiv 2111.14589](https://arxiv.org/abs/2111.14589) :  https://github.com/matplo/pyjetty/tree/master/pyjetty/alice_analysis/process/user/ml
 - [arXiv 2102.11337](https://arxiv.org/abs/2102.11337) :  https://github.com/jdmulligan/bayesian-inference
   
 And ongoing projects at:

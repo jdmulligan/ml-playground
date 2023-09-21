@@ -99,7 +99,7 @@ def simple_dnn_pytorch():
         plt.xlabel('False positive rate')
         plt.ylabel('True positive rate')
         plt.title('ROC curve')
-        plt.savefig('roc_curve.png')
+        plt.savefig('roc_curve_dnn.png')
 
 ############################################
 # Define dataset
