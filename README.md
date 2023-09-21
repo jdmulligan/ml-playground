@@ -30,7 +30,12 @@ The environment installation instructions for each project can be found in its c
 
 In general, I use one of two different python package management tools, depending on the project: venv/pip or poetry.
 
-### venv / pip approach
+### venv / pip
+<details>
+  <summary>Click for details</summary>
+<br/> 
+
+To initialize a new project:
 ```
 mkdir MyProject
 cd MyProject
@@ -41,14 +46,32 @@ pip install torch==2.0.0
 ...
 ```
 
-And you can export the requirements with:
+And you can export the requirements with (or can write a setup.py):
 ```
 pip freeze > requirements.txt
 ```
-(or can write a setup.py)
+
+To install an existing project:
+```
+cd MyProject
+python -m venv venv
+source venv/bin/activate
+```
+
+To re-enter an existing environment, you can simply do:
+```
+cd MyProject
+source venv/bin/activate
+```
+
+</details>
 
 ### poetry
+<details>
+  <summary>Click for details</summary>
+<br/> 
 
+To initialize a new project:
 ```
 poetry new myproject
 cd myproject
@@ -62,3 +85,18 @@ And you can export the requirements with:
 ```
 poetry export -f requirements.txt --output requirements.txt --without-hashes
 ```
+
+To install an existing project:
+```
+cd myproject
+poetry install
+poetry shell
+```
+
+To re-enter an existing environment, you can simply do:
+```
+cd myproject
+poetry shell
+```
+
+</details>
