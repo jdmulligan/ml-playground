@@ -24,6 +24,10 @@ def main():
     print(f'Devices: {jax.devices()}')
     print()
 
+    # Training parameters
+    learning_rate = 1.e-3
+    n_epochs = 10
+
     #----------------------------------------
     # Construct dataset
     # Note: For this part, we are free to use static variables and numpy arrays
@@ -85,7 +89,7 @@ def main():
     #----------------------------------------
     print('Training the model...')
 
-    optimizer = optax.sgd(learning_rate=0.1)
+    optimizer = optax.sgd(learning_rate=learning_rate)
 
     # Create TrainState object to manage training
     # The state is never modified, but rather we will construct a new updated state at each training step
@@ -93,12 +97,12 @@ def main():
                                                      params=params,
                                                      tx=optimizer)
     
-    trained_model_state = train_model(model_state, data_loader_train, num_epochs=100)
+    trained_model_state = train_model(model_state, data_loader_train, num_epochs=n_epochs)
 
     # Save model
     flax_checkpoints.save_checkpoint(ckpt_dir='my_checkpoints/',  # Folder to save checkpoint in
                                      target=trained_model_state,  # What to save. To only save parameters, use model_state.params
-                                     step=100,  # Training step or other metric to save best model on
+                                     step=n_epochs,  # Training step or other metric to save best model on
                                      prefix='my_dnn',  # Checkpoint file name prefix
                                      overwrite=True   # Overwrite existing checkpoint files
                                     )
